@@ -1,0 +1,15 @@
+asyncio
+aiodns
+colorlog
+pymongo
+redis
+kazoo
+elasticsearch
+gevent
+requests
+future
+aiohttp
+tqdm
+tldextract
+dnspython
+copy
