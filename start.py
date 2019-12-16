@@ -14,11 +14,12 @@ import multiprocessing as mp
 from lib.dnscore.dnsburst import dnsburst
 from lib.dnscore.searchspider import DomainSpider
 from lib.portcore.portscan import portburst
-from lib.portcore.oneportscan import Oneportburst
+from lib.portcore.port2scan import port2scan
 from lib.poccore.access import *
 from plugins.reaperLogo import get_init_params
 from lib.dnscore.dnsprepare import dnsprepare
 import requests
+import plugins.sqlop as sqlop
 
 
 handler = colorlog.StreamHandler()
@@ -127,8 +128,12 @@ def main():
         log.info("Total  scan " + str(domain_count) + " times")
 
     log.warning("Total  find " + str(len(domain_result)) + " subdomain")
-
+    
     log.warning("subdomain scan has been over")
+    print(domain_result)
+    sqlop.InserDomain(domain_result, domain)
+    # domain_result = [['blog.michealma.cf', '202.182.127.250'], ['www.michealma.cf', '104.27.178.42'], ['test.michealma.cf', '108.61.190.188'], ['www2.michealma.cf', '104.27.179.42']]
+
 
     log.warning("====================step2===================")
     mulManager = mp.Manager()  # multiprocess's manager,  to create  queue and lock and list and value
@@ -148,10 +153,6 @@ def main():
         for i in range(process):
             l = math.floor(len(domain_result)/process)
             domain_sp.append(domain_result[i * l: i * l + l])
-        if len(domain_result) % process != 0:
-            s = math.floor(len(domain_result) / process)
-            for x in domain_result[process * s:]:
-                domain_sp[process-1].append(x)
         for i in range(process):
             p = mp.Process(target=portburst,
                            args=(domain_sp[i], len(domain_sp[i]),
@@ -166,118 +167,121 @@ def main():
             
     domain_result.clear()
     server_info = dict(server_info)
-    
+    # print(server_info)
+    # server_info = {'www.anquanxiaozhan.com': {'port': {'22': 'open', '80': 'http', '888': 'http', '443': 'https'}, 'ip': '144.202.106.88', 'check': {'all_port': 'no find unauthoried problem'}}}
+    sqlop.InserPort(server_info)
+    port2scan(domain)
     log.warning("Port scan has been over")
     log.warning("====================step3===================")
-    # print(server_info)
-
-
-
-
-    mulManager = mp.Manager() # multiprocess's manager,  to create  queue and lock and list and value
-    writer_buff = mulManager.Queue() # the scan dir result buff
-    processList = []
-    url_list = Prepare4(server_info)
-
-    dir_dict = []
-    with open(dic_path) as f:
-        data = f.readlines()
-        dir_dict = [i.replace("\n",'').replace("\r",'') for i in data]
-
-    if len(url_list) <= process:
-        for i in range(len(url_list)):
-            processList.append(mp.Process(target=Dirbrust.process_start,
-                                          args=([url_list[i]], dir_dict, coroutine, xcode, writer_buff)))
-    else:
-        length = len(url_list)
-        sp = range(0, len(url_list), math.ceil(length / process))
-        url_chuck = [url_list[j:j+math.ceil(length/process)] for j in sp]
-        for i in range(process):
-            processList.append(mp.Process(target=Dirbrust.process_start,
-                                          args=(url_chuck[i],
-                                                dir_dict, coroutine, xcode, writer_buff)))
-
-    for p in processList:
-        p.start()
-    for p in processList:
-        p.join()
-
-    for u in server_info:
-        server_info[u]['url'] = {}
-
-    while not writer_buff.empty():
-        w = writer_buff.get()
-        server_info[w['netloc']]['url'][w['url']] = w['status_code']
-
-    # start cors check
-    if cors:
-        for u in server_info:
-            cors_demo = {}
-            for port in server_info[u]['port']:
-                if server_info[u]['port'][port] not in ['http','https']:
-                    pass
-                else:
-                    furl = server_info[u]['port'][port] + '://' + u + ':' + port
-                    ccc = Corser.CORS(furl)
-                    result = ccc.cors()
-                    if result:
-                        cors_demo.update({port:str(result)})
-                    else:
-                        cors_demo.update({port:"[{'no find'}]"})
-            if cors_demo:
-                server_info[u].update({'cors':cors_demo})
-            else:
-                server_info[u].update({'cors': {"allports" : '[{no web port}]'}})
-
-    if not script:
-        pass
-    else:
-        for xx in server_info:
-            for yy in server_info[xx]['port']:
-                if yy == 27017 and 'MongoDB' in script:
-                    if mongo_get(server_info[xx]['ip']):
-                        server_info[xx]['check']['27017']='confirm | MongoDB unauthoried leak'
-                    else:
-                        server_info[xx]['check']['27017']='filter | MongoDB unauthoried leak'
-                elif yy == 6379 and 'Redis' in script:
-                    if check_redis(server_info[xx]['ip']):
-                        server_info[xx]['check']['6379']='confirm | Redis unauthoried leak'
-                    else:
-                        server_info[xx]['check']['6379']='filter | Redis unauthoried leak'
-                elif yy == 11211 and 'Memcached' in script:
-                    if check_Memcached(server_info[xx]['ip']):
-                        server_info[xx]['check']['11211']='confirm | Memcached unauthoried leak'
-                    else:
-                        server_info[xx]['check']['11211']='filter | Memcached unauthoried leak'
-                elif yy == 2181 and 'ZooKeeper' in script:
-                    if check_zookeeper(server_info[xx]['ip']):
-                        server_info[xx]['check']['2181']='confirm | ZooKeeper unauthoried leak'
-                    else:
-                        server_info[xx]['check']['2181']='filter | ZooKeeper unauthoried leak'
-                elif yy == 9200 and 'ElasticSearch' in script:
-                    if check_elasticsearch(server_info[xx]['ip']):
-                        server_info[xx]['check']['837']='confirm | ElasticSearch unauthoried leak'
-                    else:
-                        server_info[xx]['check']['837']='filter | ElasticSearch unauthoried leak'
-
-
-    # write it
-    with open(save_name,'w') as f:
-        f.write(json.dumps(server_info))
-    server_info.clear()
-    log.warning("The result is save in " + save_name)
-    url = "http://127.0.0.1:10502/receiveFile"
-    files = {'file':open(save_name,'r')}
+    # server_info = {'test.michealma.cf': {'port': {}, 'ip': '108.61.190.188', 'check': {'all_port': 'no find unauthoried problem'}}, 'blog.michealma.cf': {'port': {}, 'ip': '202.182.127.250', 'check': {'all_port': 'no find unauthoried problem'}}, 'www.michealma.cf': {'port': {'80': 'http', '443': 'https', '2096': 'http', '2053': 'http', '2087': 'http', '8443': 'http'}, 'ip': '104.27.178.42', 'check': {'all_port': 'no find unauthoried problem'}}, 'www2.michealma.cf': {'port': {'80': 'http', '443': 'https', '2053': 'http', '2083': 'http', '2096': 'http'}, 'ip': '104.27.179.42', 'check': {'all_port': 'no find unauthoried problem'}}}
     
+
+
+
+    # mulManager = mp.Manager() # multiprocess's manager,  to create  queue and lock and list and value
+    # writer_buff = mulManager.Queue() # the scan dir result buff
+    # processList = []
+    # url_list = Prepare4(server_info)
+
+    # dir_dict = []
+    # with open(dic_path) as f:
+    #     data = f.readlines()
+    #     dir_dict = [i.replace("\n",'').replace("\r",'') for i in data]
+
+    # if len(url_list) <= process:
+    #     for i in range(len(url_list)):
+    #         processList.append(mp.Process(target=Dirbrust.process_start,
+    #                                       args=([url_list[i]], dir_dict, coroutine, xcode, writer_buff)))
+    # else:
+    #     length = len(url_list)
+    #     sp = range(0, len(url_list), math.ceil(length / process))
+    #     url_chuck = [url_list[j:j+math.ceil(length/process)] for j in sp]
+    #     for i in range(process):
+    #         processList.append(mp.Process(target=Dirbrust.process_start,
+    #                                       args=(url_chuck[i],
+    #                                             dir_dict, coroutine, xcode, writer_buff)))
+
+    # for p in processList:
+    #     p.start()
+    # for p in processList:
+    #     p.join()
+
+    # for u in server_info:
+    #     server_info[u]['url'] = {}
+
+    # while not writer_buff.empty():
+    #     w = writer_buff.get()
+    #     server_info[w['netloc']]['url'][w['url']] = w['status_code']
+
+    # # start cors check
+    # if cors:
+    #     for u in server_info:
+    #         cors_demo = {}
+    #         for port in server_info[u]['port']:
+    #             if server_info[u]['port'][port] not in ['http','https']:
+    #                 pass
+    #             else:
+    #                 furl = server_info[u]['port'][port] + '://' + u + ':' + port
+    #                 ccc = Corser.CORS(furl)
+    #                 result = ccc.cors()
+    #                 if result:
+    #                     cors_demo.update({port:str(result)})
+    #                 else:
+    #                     cors_demo.update({port:"[{'no find'}]"})
+    #         if cors_demo:
+    #             server_info[u].update({'cors':cors_demo})
+    #         else:
+    #             server_info[u].update({'cors': {"allports" : '[{no web port}]'}})
+
+    # if not script:
+    #     pass
+    # else:
+    #     for xx in server_info:
+    #         for yy in server_info[xx]['port']:
+    #             if yy == 27017 and 'MongoDB' in script:
+    #                 if mongo_get(server_info[xx]['ip']):
+    #                     server_info[xx]['check']['27017']='confirm | MongoDB unauthoried leak'
+    #                 else:
+    #                     server_info[xx]['check']['27017']='filter | MongoDB unauthoried leak'
+    #             elif yy == 6379 and 'Redis' in script:
+    #                 if check_redis(server_info[xx]['ip']):
+    #                     server_info[xx]['check']['6379']='confirm | Redis unauthoried leak'
+    #                 else:
+    #                     server_info[xx]['check']['6379']='filter | Redis unauthoried leak'
+    #             elif yy == 11211 and 'Memcached' in script:
+    #                 if check_Memcached(server_info[xx]['ip']):
+    #                     server_info[xx]['check']['11211']='confirm | Memcached unauthoried leak'
+    #                 else:
+    #                     server_info[xx]['check']['11211']='filter | Memcached unauthoried leak'
+    #             elif yy == 2181 and 'ZooKeeper' in script:
+    #                 if check_zookeeper(server_info[xx]['ip']):
+    #                     server_info[xx]['check']['2181']='confirm | ZooKeeper unauthoried leak'
+    #                 else:
+    #                     server_info[xx]['check']['2181']='filter | ZooKeeper unauthoried leak'
+    #             elif yy == 9200 and 'ElasticSearch' in script:
+    #                 if check_elasticsearch(server_info[xx]['ip']):
+    #                     server_info[xx]['check']['837']='confirm | ElasticSearch unauthoried leak'
+    #                 else:
+    #                     server_info[xx]['check']['837']='filter | ElasticSearch unauthoried leak'
+
+
+    # # write it
+    # with open(save_name,'w') as f:
+    #     f.write(json.dumps(server_info))
+    # server_info.clear()
+    # log.warning("The result is save in " + save_name)
+    # url = "http://127.0.0.1:10502/receiveFile"
+    # files = {'file':open(save_name,'r')}
+    
+    # # try:
+    # reponse = requests.post(url,files=files)
     # try:
-    reponse = requests.post(url,files=files)
-    try:
-        if reponse.status_code == 200:
-            log.warning("Sucess | you can view index.html")
-        else:
-            log.error("Fail | java server can't run")
-    except:
-        log.error("Fail | java server can't run")
+    #     if reponse.status_code == 200:
+    #         log.warning("Sucess | you can view index.html")
+    #     else:
+    #         log.error("Fail | java server can't run")
+    # except:
+    #     log.error("Fail | java server can't run")
 
     
     

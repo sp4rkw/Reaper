@@ -8,6 +8,7 @@ import multiprocessing as mp
 import requests
 
 
+
 handler = colorlog.StreamHandler()
 formatter = colorlog.ColoredFormatter(
     '%(log_color)s%(asctime)s [%(name)s] [%(levelname)s] %(message)s%(reset)s',
@@ -48,8 +49,6 @@ class portburst():
         self.s.headers.update(self.headers)
         self.run()
 
-
-
     def get_socket_info(self, target_ip, target_port):
         #socket get banner
         try:
@@ -68,7 +67,7 @@ class portburst():
             flag,res = self.get_socket_info(target_ip=target_server, target_port=scan_port)
             if flag:
                 res = str(res, encoding="utf-8")
-                logc.info('[+] -- open   {}\t{}'.format(str(scan_port), res))
+                logc.info('[+] -- open   {}'.format(str(scan_port)))
                 if ('HTTP' in res) or ('HTML' in res):
                     html = self.s.get("http://"+scanSite+":"+str(scan_port), timeout=3)
                     if html.status_code and scan_port != 443:
@@ -78,19 +77,19 @@ class portburst():
                         if html.status_code:
                             ret[str(scan_port)]="https"
                         else:
-                            ret[str(scan_port)]=res
+                            ret[str(scan_port)]='close'
                 else:
-                    ret[str(scan_port)]=res  
-                if scan_port == 27017:#[,6379,11211,5900,2375,2181,837]
-                    self.server_unauthoried['check'][str(scan_port)]='Doubtful | MongoDB unauthoried leak'
-                elif scan_port == 6379:
-                    self.server_unauthoried['check'][str(scan_port)]='Doubtful | Redis unauthoried leak'
-                elif scan_port == 11211:
-                    self.server_unauthoried['check'][str(scan_port)]='Doubtful | Memcached unauthoried leak'
-                elif scan_port == 2181:
-                    self.server_unauthoried['check'][str(scan_port)]='Doubtful | ZooKeeper unauthoried leak'
-                elif scan_port == 9200:
-                    self.server_unauthoried['check'][str(scan_port)]='Doubtful | ElasticSearch unauthoried leak'
+                    ret[str(scan_port)]='open'  
+                # if scan_port == 27017:#[,6379,11211,5900,2375,2181,837]
+                #     self.server_unauthoried['check'][str(scan_port)]='Doubtful | MongoDB unauthoried leak'
+                # elif scan_port == 6379:
+                #     self.server_unauthoried['check'][str(scan_port)]='Doubtful | Redis unauthoried leak'
+                # elif scan_port == 11211:
+                #     self.server_unauthoried['check'][str(scan_port)]='Doubtful | Memcached unauthoried leak'
+                # elif scan_port == 2181:
+                #     self.server_unauthoried['check'][str(scan_port)]='Doubtful | ZooKeeper unauthoried leak'
+                # elif scan_port == 9200:
+                #     self.server_unauthoried['check'][str(scan_port)]='Doubtful | ElasticSearch unauthoried leak'
                 self.server_port.update(ret)
         except Exception as e:
             logc.error(str(scan_port) +'\t' +e)
@@ -122,7 +121,7 @@ class portburst():
                     else:
                         server_info_demo.update({'check':{'all_port':"no find unauthoried problem"}})
                     self.server_info.update({self.server_list[i][0]:dict(server_info_demo)})
-        else:
+        else:# p x-xxx
             with ThreadPoolExecutor(self.threadnum) as executor:
                 tasks = []
                 for i in range(self.scan_total):
@@ -140,3 +139,4 @@ class portburst():
 
                     # print(server_info_demo)
                     self.server_info.update({self.server_list[i][0]: dict(server_info_demo)})
+                    # print(self.server_info)
