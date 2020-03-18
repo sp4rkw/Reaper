@@ -1,290 +1,219 @@
 import asyncio
-import aiodns
 import os
-import logging
-import colorlog
-import json
-import math
-import copy
+import sys
 import dns.resolver as Resolver
-import lib.dircore.Corser as Corser
-from lib.dircore.Scanner import Prepare4
-import lib.dircore.dirbrust as Dirbrust
-import multiprocessing as mp
 from lib.dnscore.dnsburst import dnsburst
-from lib.dnscore.searchspider import DomainSpider
-from lib.portcore.portscan import portburst
-from lib.portcore.port2scan import port2scan
-from lib.poccore.access import *
-from plugins.reaperLogo import get_init_params
+from lib.dnscore.subdomain_api import *
+from lib.webcore.titlesearch import *
+# from lib.portcore.portscan import portburst
+# from lib.portcore.port2scan import port2scan
+from lib.webcore.cdn_detect import *
+from lib.webcore.record import recordrun
 from lib.dnscore.dnsprepare import dnsprepare
 import requests
 import plugins.sqlop as sqlop
+import configparser
+import re
+import IPy
+import pymysql
+import time
+import yagmail
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 
 
-handler = colorlog.StreamHandler()
-formatter = colorlog.ColoredFormatter(
-    '%(log_color)s%(asctime)s [%(name)s] [%(levelname)s] %(message)s%(reset)s',
-    datefmt=None,
-    reset=True,
-    log_colors={
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-    },
-    secondary_log_colors={},
-    style='%')
-handler.setFormatter(formatter)
-log = colorlog.getLogger('log')
-log.addHandler(handler)
-log.setLevel(logging.INFO)
 
 
-def main():
-    args = get_init_params()
-    domain = args.domain  # scan  domain
-    subname_dict = args.dict1  # dict  name
-    dns_server = None
-    startnum = None
-    stopnum = None
-    ports = None
-    xcode = []
-    script = None
-    pctnum = args.pctnum
-    threadnum = args.threadnum
-    retrycount = args.retrycount
-    dic_path = args.dict2
-    process = int(args.process)
-    # redirect = args.redirect
-    engine = args.engine
-    coroutine = args.dctnum
-    cors = args.cors
-    if args.dns:
-        dns_server = args.dns.split(",") #dns server
-    if args.port and '-' in args.port:
-        startnum = int(args.port.split('-')[0])
-        stopnum = int(args.port.split('-')[1])
-    elif args.port:
-        ports = args.port.split(',')
-    else:
-        startnum = 21
-        stopnum = 65534
-    if args.xcode:
-        ycode = args.xcode.split(',')
-        xcode = [int(x) for x in ycode]
-    if args.checkpoc:
-        script = args.checkpoc.split(',')
-    if os.name == 'nt':  # subname_dict  
-        subname_dict = os.getcwd() + '\\dict\\' + subname_dict
-        save_name = os.getcwd() + '\\output\\' + domain + '.json'
-        dic_path = os.getcwd() + '\\dict\\' + dic_path
-    else:
-        subname_dict = os.getcwd() + '/dict/' + subname_dict
-        save_name = os.getcwd() + '/output/' + domain + '.json'
-        dic_path = os.getcwd() + '/dict/' + dic_path
-
-    
-    log.warning("====================step1===================")
-    log.info("choose subname dict：" + subname_dict)
-
+def step1(subname_dict, domain, host, user, pwd, database):
+    print("[+ DNSBURST API] 开始DNS爆破")
+    print("[+ DICT] 确认字典路径："+ subname_dict)
+    # current_domain_list = sqlop.SelectDomain(domain, personkey) # 取出数据库已有数据，通过ip来进行去重
+    timeout_domain = []
+    allip_dict = {}
     domain_result = []  # subname list
     subname_list,domain_count = dnsprepare(subname_dict)  # scan domain list
-    log.info("A total of {} domain names need to be scanned".format(str(domain_count)))
+    print("[+ DICT] 子域名字典已加载，共{}".format(str(domain_count)))
     s = dnsburst(
         domain=domain,
         subdomain_list=subname_list,
-        domain_result=domain_result,
-        domain_count=domain_count,
-        dns_servers=dns_server,
-        ctnum=pctnum,
-        retrycount=retrycount)
+        allip_dict=allip_dict,
+        create_limit=30000,
+        timeout_domain=timeout_domain,
+        domain_result=domain_result)
+    s.get_analysis()
     s.run()
-    subname_list.clear()
 
-    domain_demo = set()
-    if engine:
-        SS = DomainSpider(domain,domain_demo)
-        SS.run()
-        domain_demo = list(domain_demo)
-        domain_keys = [x[0] for x in domain_result]
-        domain_value = [x[1] for x in domain_result]
-        domain_value = set(domain_value)
-        for x in domain_demo:
-            if x in domain_keys:
-                pass
-            else:
-                A = Resolver.query(x,'A').response.answer
-                if len(A) > 1:
-                    B = A[1].items
-                    C = None if len(A) < 3 else A[2].items 
-                    B = C if 'com' in str(B[0]) else B
-                    if str(B[0]) in domain_value:
-                        pass
-                    else:
-                        domain_result.append([x,str(B[0])])  
-                        domain_value.add(str(B[0])) 
-        log.info("Total  scan " + str(domain_count+4000) + " times")      
+    api_sublist = subdomainApi(domain)# 各个api接口获取的字典列表
+
+    domain_result.extend(api_sublist)
+    domain_result = list(set(domain_result)) # 去重资产
+
+    # for domain2 in domain_result:
+    #     domain_result2 = [] # 第二层子域名收集
+    #     print("[+ DICT] 子域名字典已加载，共{}".format(str(domain_count)))
+    #     api_sublist = subdomainApi(domain2)# 各个api接口获取的字典列表
+    #     domain_result2.extend(api_sublist)
+    #     domain_result2 = list(set(domain_result2))
+    #     domain_result.extend(domain_result2)
+
+    # 网页标题信息/https信息收集
+    print('[+ DNSBURST API] '+"总共发现" + str(len(domain_result)) + "个子域名")
+    domain_result_add = []
+    for subdomain in domain_result:
+        domain_result_add.append("http://"+subdomain)
+        domain_result_add.append("https://"+subdomain)
+    title_result = titlerun(domain_result_add)
+
+    # cdn加载
+    cdn_demo,ip_demo = cdnrun(domain_result) # 回来的是没有http/https的形式，补全
+    cdn_dict = {}
+    ip_dict = {}
+    for line in cdn_demo.keys():
+        cdn_dict['http://'+line] = cdn_demo[line]
+        cdn_dict['https://'+line] = cdn_demo[line]
+    for line in ip_demo.keys():    
+        ip_dict['http://'+line] = ip_demo[line]
+        ip_dict['https://'+line] = ip_demo[line]
+    
+    # 备案信息查询模块
+    recorddata = recordrun(domain)
+
+
+    #domain_result, domain, title_result, cdn_dict, ip_dict, recorddata, host, user, pwd, database
+    sqlop.InserDomain(domain_result_add, domain, title_result, cdn_dict, ip_dict, recorddata, host, user, pwd, database) # 插入子域名的结果
+    # domain_result.clear() # 节约空间，释放变量
+
+
+
+'''端口暂时不开启
+def step2(domain, iplist, personkey, startnum, stopnum, threadnum):
+    current_domain_list = ""
+    if domain:
+        current_domain_list = sqlop.SelectDomain(domain, personkey) # 第二次查询，相当于拿到目前数据库的子域名情况，只需要ip列表
     else:
-        log.info("Total  scan " + str(domain_count) + " times")
+        current_domain_list = iplist
 
-    log.warning("Total  find " + str(len(domain_result)) + " subdomain")
-    
-    log.warning("subdomain scan has been over")
-    print(domain_result)
-    sqlop.InserDomain(domain_result, domain)
-    # domain_result = [['blog.michealma.cf', '202.182.127.250'], ['www.michealma.cf', '104.27.178.42'], ['test.michealma.cf', '108.61.190.188'], ['www2.michealma.cf', '104.27.179.42']]
+    print("====================step2===================")
+    server_info = {}
+    for ip in current_domain_list:
+        server_info.update({ip:{}})
 
 
-    log.warning("====================step2===================")
-    mulManager = mp.Manager()  # multiprocess's manager,  to create  queue and lock and list and value
-    server_info = mulManager.dict() 
-    if len(domain_result) < process:
-        p = portburst(
-            server_list = domain_result,
-            scan_total = len(domain_result),
-            server_info = server_info,
-            startnum = startnum,
-            stopnum = stopnum,
-            ports = ports,
-            threadnum = threadnum)
+    portburst(
+    server_list = current_domain_list,
+    server_info = server_info,
+    startnum = startnum,
+    stopnum = stopnum,
+    threadnum = threadnum)
+
+    print(server_info)
+    sqlop.InserPort(server_info, personkey)
+    port2scan(current_domain_list, personkey)
+    print("Port scan has been over")
+'''
+
+def start(): # target 为目标
+    config_txt = "config.ini" # 统一配置文件，将命令行模式转变为ini
+    if os.name == 'nt':  # 根据当前路径重新赋值为绝对路径 
+        config_txt = sys.path[0] + "\\" +config_txt
     else:
-        domain_sp = []
-        ts = []
-        for i in range(process):
-            l = math.floor(len(domain_result)/process)
-            domain_sp.append(domain_result[i * l: i * l + l])
-        for i in range(process):
-            p = mp.Process(target=portburst,
-                           args=(domain_sp[i], len(domain_sp[i]),
-                                 server_info, ports, threadnum, startnum,
-                                 stopnum))
-            ts.append(p)
-            p.start()
+        config_txt = sys.path[0] + "/" +config_txt
 
-        for pr in ts:
-            pr.join()
-        
-            
-    domain_result.clear()
-    server_info = dict(server_info)
-    # print(server_info)
-    # server_info = {'www.anquanxiaozhan.com': {'port': {'22': 'open', '80': 'http', '888': 'http', '443': 'https'}, 'ip': '144.202.106.88', 'check': {'all_port': 'no find unauthoried problem'}}}
-    sqlop.InserPort(server_info)
-    port2scan(domain)
-    log.warning("Port scan has been over")
-    log.warning("====================step3===================")
-    # server_info = {'test.michealma.cf': {'port': {}, 'ip': '108.61.190.188', 'check': {'all_port': 'no find unauthoried problem'}}, 'blog.michealma.cf': {'port': {}, 'ip': '202.182.127.250', 'check': {'all_port': 'no find unauthoried problem'}}, 'www.michealma.cf': {'port': {'80': 'http', '443': 'https', '2096': 'http', '2053': 'http', '2087': 'http', '8443': 'http'}, 'ip': '104.27.178.42', 'check': {'all_port': 'no find unauthoried problem'}}, 'www2.michealma.cf': {'port': {'80': 'http', '443': 'https', '2053': 'http', '2083': 'http', '2096': 'http'}, 'ip': '104.27.179.42', 'check': {'all_port': 'no find unauthoried problem'}}}
+    '''读取配置文件'''
+    # 创建配置文件对象
+    con = configparser.ConfigParser()
+    # 读取文件
+    con.read(config_txt, encoding='utf-8')
+    # 获取所有section
+    sections = con.sections()
+    # 获取特定section
+    items = dict(con.items('port')) # 端口参数 21-65534默认
+    startnum = int(items['startnum'])
+    items = dict(con.items('port')) 
+    stopnum = int(items['stopnum'])
+    items = dict(con.items('dns')) 	# dns爆破字典
+    subname_dict = items['subdict']
+    items = dict(con.items('port')) # 端口扫描线程数目控制
+    threadnum = int(items['threadnum'])
+
+    '''读取邮箱配置'''
+    items = dict(con.items('email'))
+    email = items['email']
+    items = dict(con.items('email')) 
+    code = items['code']
+    items = dict(con.items('email'))
+    emailpower = False if 'False' == items['emailpower'] else True
+
+    '''读取mysql配置'''
+    items = dict(con.items('mysql'))
+    host = items['host']
+    items = dict(con.items('mysql')) 
+    user = items['user']
+    items = dict(con.items('mysql')) 
+    password = items['password']
+    items = dict(con.items('mysql')) 
+    database = items['database']
+    
+    print("[+ CONFIG] config.ini 配置加载完毕")
+
+    '''处理子域名字典'''
+    if os.name == 'nt':  # 根据当前路径重新赋值为绝对路径 
+        subname_dict = sys.path[0] + '\\dict\\' + subname_dict
+    else:
+        subname_dict = sys.path[0] + '/dict/' + subname_dict
+
+    '''取出任务，标记完成，添加取出任务时间'''
+    task_list = [] # 目前数据库需要去执行的任务
+    db = pymysql.connect(host, user, password, database)
+    cursor = db.cursor()
+    sql0 = "select task from subdomaintask where flag = '0'"
+    cursor.execute(sql0) # 执行sql语句
+    results = cursor.fetchall()
+    if results:
+        for line in results:
+            task_list.append(line[0])
+    del(results)
     
 
+    if task_list:
+        print("[+ TASK] 本次任务清单已加载完毕，共{}个任务".format(str(len(task_list))))
+        for domain in task_list:
+            step1(subname_dict, domain, host, user, password, database)
+            sql1 = "UPDATE subdomaintask SET flag = '1', outtime = '{}' WHERE task = '{}'".format(str(int(time.time())), domain)
+            try:
+                cursor.execute(sql1) # 执行sql语句
+                db.commit()         # 提交到数据库执行
+            except:
+                db.rollback()       # 如果发生错误则回滚
+            print("[+ TASK] 任务 {} 已经完成".format(domain))
+    else:
+        print("[+ TASK] 本次未发现待完成任务，自动终止")
 
 
-    # mulManager = mp.Manager() # multiprocess's manager,  to create  queue and lock and list and value
-    # writer_buff = mulManager.Queue() # the scan dir result buff
-    # processList = []
-    # url_list = Prepare4(server_info)
-
-    # dir_dict = []
-    # with open(dic_path) as f:
-    #     data = f.readlines()
-    #     dir_dict = [i.replace("\n",'').replace("\r",'') for i in data]
-
-    # if len(url_list) <= process:
-    #     for i in range(len(url_list)):
-    #         processList.append(mp.Process(target=Dirbrust.process_start,
-    #                                       args=([url_list[i]], dir_dict, coroutine, xcode, writer_buff)))
-    # else:
-    #     length = len(url_list)
-    #     sp = range(0, len(url_list), math.ceil(length / process))
-    #     url_chuck = [url_list[j:j+math.ceil(length/process)] for j in sp]
-    #     for i in range(process):
-    #         processList.append(mp.Process(target=Dirbrust.process_start,
-    #                                       args=(url_chuck[i],
-    #                                             dir_dict, coroutine, xcode, writer_buff)))
-
-    # for p in processList:
-    #     p.start()
-    # for p in processList:
-    #     p.join()
-
-    # for u in server_info:
-    #     server_info[u]['url'] = {}
-
-    # while not writer_buff.empty():
-    #     w = writer_buff.get()
-    #     server_info[w['netloc']]['url'][w['url']] = w['status_code']
-
-    # # start cors check
-    # if cors:
-    #     for u in server_info:
-    #         cors_demo = {}
-    #         for port in server_info[u]['port']:
-    #             if server_info[u]['port'][port] not in ['http','https']:
-    #                 pass
-    #             else:
-    #                 furl = server_info[u]['port'][port] + '://' + u + ':' + port
-    #                 ccc = Corser.CORS(furl)
-    #                 result = ccc.cors()
-    #                 if result:
-    #                     cors_demo.update({port:str(result)})
-    #                 else:
-    #                     cors_demo.update({port:"[{'no find'}]"})
-    #         if cors_demo:
-    #             server_info[u].update({'cors':cors_demo})
-    #         else:
-    #             server_info[u].update({'cors': {"allports" : '[{no web port}]'}})
-
-    # if not script:
-    #     pass
-    # else:
-    #     for xx in server_info:
-    #         for yy in server_info[xx]['port']:
-    #             if yy == 27017 and 'MongoDB' in script:
-    #                 if mongo_get(server_info[xx]['ip']):
-    #                     server_info[xx]['check']['27017']='confirm | MongoDB unauthoried leak'
-    #                 else:
-    #                     server_info[xx]['check']['27017']='filter | MongoDB unauthoried leak'
-    #             elif yy == 6379 and 'Redis' in script:
-    #                 if check_redis(server_info[xx]['ip']):
-    #                     server_info[xx]['check']['6379']='confirm | Redis unauthoried leak'
-    #                 else:
-    #                     server_info[xx]['check']['6379']='filter | Redis unauthoried leak'
-    #             elif yy == 11211 and 'Memcached' in script:
-    #                 if check_Memcached(server_info[xx]['ip']):
-    #                     server_info[xx]['check']['11211']='confirm | Memcached unauthoried leak'
-    #                 else:
-    #                     server_info[xx]['check']['11211']='filter | Memcached unauthoried leak'
-    #             elif yy == 2181 and 'ZooKeeper' in script:
-    #                 if check_zookeeper(server_info[xx]['ip']):
-    #                     server_info[xx]['check']['2181']='confirm | ZooKeeper unauthoried leak'
-    #                 else:
-    #                     server_info[xx]['check']['2181']='filter | ZooKeeper unauthoried leak'
-    #             elif yy == 9200 and 'ElasticSearch' in script:
-    #                 if check_elasticsearch(server_info[xx]['ip']):
-    #                     server_info[xx]['check']['837']='confirm | ElasticSearch unauthoried leak'
-    #                 else:
-    #                     server_info[xx]['check']['837']='filter | ElasticSearch unauthoried leak'
 
 
-    # # write it
-    # with open(save_name,'w') as f:
-    #     f.write(json.dumps(server_info))
-    # server_info.clear()
-    # log.warning("The result is save in " + save_name)
-    # url = "http://127.0.0.1:10502/receiveFile"
-    # files = {'file':open(save_name,'r')}
+    '''target处理：1.域名 2. ip类-列表型，逗号分隔型'''
+
+    # iplist = "" # 从ip开始
     
-    # # try:
-    # reponse = requests.post(url,files=files)
-    # try:
-    #     if reponse.status_code == 200:
-    #         log.warning("Sucess | you can view index.html")
+    # if bool(re.search('[a-z]', target)):
+    #     domain = target
+    #     step1(subname_dict, domain, personkey, pctnum, engine)
+    #     step2(domain, None, personkey, startnum, stopnum, threadnum)
+    # else:
+    #     if ',' in target:
+    #         iplist = target.split(",")
     #     else:
-    #         log.error("Fail | java server can't run")
-    # except:
-    #     log.error("Fail | java server can't run")
+    #         ips = IPy.IP(target) # 解析ip格式，ips类型<class 'IPy.IP'>
+    #         iplist = [str(p) for p in ips]
+    #     step2(None, iplist, personkey, startnum, stopnum, threadnum)
 
-    
-    
+    # if emailpower:
+    #     # 登录你的邮箱
+    #     yag = yagmail.SMTP(user = email, password = code, host = 'smtp.qq.com')
+    #     # 发送邮件
+    #     yag.send(to = [targetemail], subject = 'Reaper - 扫描任务已经结束', contents = ['下述任务已经扫描结束，请上线查看', target])
+
 
 if __name__ == "__main__":
-    main()
+    start()

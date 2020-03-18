@@ -53,17 +53,17 @@ $$ |  $$ |\$$$$$$$\ \$$$$$$$ |$$$$$$$  |\$$$$$$$\ $$ |
         type=int,
         default=100,
         help="Appoint the num of coroutine|dir")
-    parser.add_argument(
-        "-d1",
-        "--dict1",
-        type=str,
-        help='Appoint a dictionary for dnssearch',
-        default='subnames_full.txt')
-    parser.add_argument(
-        "-d2", 
-        "--dict2", 
-        default='dicc.txt', 
-        help="Appoint a dictionary for dirsearch")
+    # parser.add_argument(
+    #     "-d1",
+    #     "--dict1",
+    #     type=str,
+    #     help='Appoint a dictionary for dnssearch',
+    #     default='subnames_full.txt')
+    # parser.add_argument(
+    #     "-d2", 
+    #     "--dict2", 
+    #     default='dicc.txt', 
+    #     help="Appoint a dictionary for dirsearch")
     parser.add_argument(
         "-u", 
         "--domain", 
@@ -117,10 +117,10 @@ $$ |  $$ |\$$$$$$$\ \$$$$$$$ |$$$$$$$  |\$$$$$$$\ $$ |
         action='store_true',
         default=False, 
         help="check cors or not")
-    parser.add_argument(
-        "--dns", 
-        type=str, 
-        help='Appoint a dnsserver')
+    # parser.add_argument(
+    #     "--dns", 
+    #     type=str, 
+    #     help='Appoint a dnsserver')
     parser.add_argument(
         "--engine", 
         action='store_true',

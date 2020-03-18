@@ -1,69 +1,134 @@
+
 # Reaper
 
-一款用于收集渗透测试信息的工具，支持：子域名扫描，端口扫描，目录扫描，未授权验证，cors检测，更多持续开发
+一款SRC资产信息收集的工具
+
+子域名/cdn检测/备案信息/待开发...
+
+[![License](https://img.shields.io/badge/license-Apache%202-green.svg)](https://www.apache.org/licenses/LICENSE-2.0)    [![Download](https://img.shields.io/github/v/release/q1271964185/Reaper)](https://github.com/q1271964185/Reaper)
 
 # 功能介绍
 
-- 支持子域名爆破与爬虫双模式
-- 支持常见未授权端口验证
-- 支持web服务目录敏感fuzz
-- 支持cors检测
-- 支持字典自定义
-- 支持页面展示结果
-- 支持页面二次筛选资产
-- 对子域名泛解析进行过滤
-- 对端口伪web banner进行过滤
-- 对目录采取启发式扫描，过滤假性404
-- 采用协程，线程池，多进程全面提速
+- 支持众多第三方接口子域名查询接口，包括基于证书的子域名收集
+- 支持cdn检测，基于cname与常见cdn段检测
+- 支持备案信息查询
+- 支持web界面显示
 
+# 演示截图
+
+![](images/2020-03-18-17-57-46.png)
+
+![](images/2020-03-18-17-57-59.png)
+
+![](images/2020-03-18-17-58-28.png)
 
 # 使用方法
 
 测试环境:
-- ubuntu/windows
-- python 3.6/3.7/3.8
+- windows
+- python 3.7
+- mysql8
 
 环境安装：
+1、python环境
+
 ```
+# 可能没有标记完全，遇到缺少的库，自行pip一下
 pip install -r requirement.txt
 ```
+2、mysql8安装
 
-查看参数帮助：
+> 参考链接：https://www.cnblogs.com/luoli-/p/9249769.html
+
+3、config.ini配置
+
+```ini
+;reaper配置文件
+
+[port];暂时废弃，无需配置
+startnum = 21
+stopnum = 65534
+threadnum = 200
+
+
+[dns]
+dnsnum = 8000
+subdict = sub_full.txt;dict目录下自行选择添加
+
+[email];暂时废弃，无需配置
+email = 1
+code = 2
+emailpower = False
+
+[mysql]
+host = 192.168.1.111;修改为mysql地址，web与mysql同一服务器则127.0.0.1
+user = root
+password = 123456
+database = reaper
 ```
-python start.py -h
+4、数据库建立
+
+```bash
+#新建reaper数据库，编码ut8-8
+
+# 新建两个表
+CREATE TABLE `reaper`.`subdomaintask`  (
+  `id` int(0) NOT NULL AUTO_INCREMENT,
+  `task` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `intime` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `flag` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `outtime` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+
+CREATE TABLE `reaper`.`subdomain`  (
+  `id` int(0) NOT NULL AUTO_INCREMENT,
+  `subdomain` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `title` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `wtime` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `cdn` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `record` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `ipwhere` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `groupdomain` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 412 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 ```
 
-推荐用法：
+# 使用说明
+
+web部分由于默认个人使用，没做登陆注册，之后补，，，
+
+进入http://你的ip/，之后f12修改cookies，新增key 123456使用
+
+增加任务在web界面完成，web启动命令
+
+```bash
+cd ./server/reaper/
+
+python manage.py runserver 0:8888  #8888为端口，自定义即可
 ```
-# 启动本地java web服务，双击./view/start.bat
 
-# 启动资产收集
-python start.py -u test.com  -p 21-20000 -d1 subnames_full.txt -d2 dicc.txt -cd 100 -x 403,402,401,302,301 --engine --cors
-
-# 进入./view/view/index.html，查看资产收集页面
+任务增加之后，另开一个命令窗口，回到根目录下
+```bash
+python start.py #一直等到执行完吧
 ```
-最终页面效果图：
 
-![](./image/1.png)
+linux推荐screen后台执行
 
 
 # 吐槽与后续
 
-此项目为参加19年上海市网络安全大赛作品赛作品，很遗憾并未取得很好的成绩（小声bb，拿论文直接改个软件还是好拿奖啊，反正评委看不懂）
+此项目1.0版本已废弃，现版本2.0，逐渐完善中，后续添加：
 
-后续想法：
-- 端口扫描自己写确实很难，也没找到什么好的技术方案，准备改调用masscan
-- 这种长时间的资产收集，还是得写个后端，配合数据库
-- 完善漏洞验证poc自定义添加
-- 封装docker
-- ........
+- 端口扫描处理
+- 增加crawlergo爬虫
+- 增加被动扫描结果的入库
+- 增加与awvs的互动
+- 增加xray poc的结合处理
+- ......再说吧，上面这些够弄了
 
-上述想法实际还得花费很久的时间，如果有兴趣参与开发的，可以issues与我联系，如有使用bug也欢迎提出~
+感谢1.0版本中一起开发的三位小伙伴
 
-最后感谢我的团队三个成员：
+@安逸猪 @打代码要优雅 @我不会翻转二叉树
 
-@安逸猪
-
-@打代码要优雅
-
-@我不会翻转二叉树
+感谢@b0ring师傅在2.0版本开发中的思路交流
