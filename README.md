@@ -3,12 +3,10 @@
 
 一款SRC资产信息收集的工具
 
-子域名/cdn检测/备案信息/待开发...
-
-[![License](https://img.shields.io/badge/license-Apache%202-green.svg)](https://www.apache.org/licenses/LICENSE-2.0)    [![Download](https://img.shields.io/github/v/release/q1271964185/Reaper)](https://github.com/q1271964185/Reaper)
-
+[![License](https://img.shields.io/badge/license-Apache%202-green.svg)](https://www.apache.org/licenses/LICENSE-2.0)   
 # 功能介绍
 
+- 支持dns爆破子域名
 - 支持众多第三方接口子域名查询接口，包括基于证书的子域名收集
 - 支持cdn检测，基于cname与常见cdn段检测
 - 支持备案信息查询

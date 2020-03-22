@@ -47,14 +47,17 @@ def step1(subname_dict, domain, host, user, pwd, database):
 
     domain_result.extend(api_sublist)
     domain_result = list(set(domain_result)) # 去重资产
+    domain_result_demo = []
 
     # for domain2 in domain_result:
     #     domain_result2 = [] # 第二层子域名收集
-    #     print("[+ DICT] 子域名字典已加载，共{}".format(str(domain_count)))
     #     api_sublist = subdomainApi(domain2)# 各个api接口获取的字典列表
     #     domain_result2.extend(api_sublist)
     #     domain_result2 = list(set(domain_result2))
-    #     domain_result.extend(domain_result2)
+    #     domain_result_demo.extend(domain_result2)
+
+    # domain_result.extend(domain_result_demo)
+    # domain_result = list(set(domain_result)) # 去重资产
 
     # 网页标题信息/https信息收集
     print('[+ DNSBURST API] '+"总共发现" + str(len(domain_result)) + "个子域名")
