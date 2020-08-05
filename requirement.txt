@@ -1,11 +1,9 @@
-asyncio
-dnspython
-aiodns
+colorlog
 pymysql
-gevent
 requests
-aiohttp
-IPy
 yagmail
-beautifulsoup4
-django
+PyMySQL==0.9.3
+Django==2.1.10
+booleano==1.1a2
+IPy==1.00
+Shapely==1.7.0

@@ -1,26 +1,41 @@
-
 # Reaper
 
-一款SRC资产信息收集的工具
+一款SRC资产信息收集的工具，你身边的资产收割利器~
 
-[![License](https://img.shields.io/badge/license-Apache%202-green.svg)](https://www.apache.org/licenses/LICENSE-2.0)   
+[![License](D:%5CGitHub%5CReaper%5Clicense-Apache%202-green.svg)](https://www.apache.org/licenses/LICENSE-2.0)   
 # 功能介绍
 
-- 支持dns爆破子域名
-- 支持众多第三方接口子域名查询接口，包括基于证书的子域名收集
+- 支持基于oneforall收集资产的导入
+- 对oneforall导入资产进行二次梳理，优化显示
 - 支持cdn检测，基于cname与常见cdn段检测
-- 支持备案信息查询
-- 支持web界面显示
+- 支持域名备案/同备案站点信息查询
+- 支持清理awvs
+- 支持清理数据之后快速提交给awvs扫描
+- 支持xray-poc编写，集成工具来源[xray-poc-generation](https://github.com/phith0n/xray-poc-generation)
 
 # 演示截图
 
-![](images/2020-03-18-17-57-46.png)
+1. 任务模块
 
-![](images/2020-03-18-17-57-59.png)
+   ![image-20200805160625405](./img/image-20200805160625405.png)
 
-![](images/2020-03-18-17-58-28.png)
+2. 删除任务模块
 
-# 使用方法
+   ![image-20200805160929739](./img/image-20200805160929739.png)
+
+3. 资产模块
+
+   ![image-20200805160730948](./img/image-20200805160730948.png)
+
+4. 同备案查询
+
+   ![image-20200805161020441](./img/image-20200805161020441.png)
+
+5. xray-poc编写模块
+
+   ![image-20200805161049622](./img/image-20200805161049622.png)
+
+# 快速配置
 
 测试环境:
 - windows
@@ -32,6 +47,7 @@
 
 ```
 # 可能没有标记完全，遇到缺少的库，自行pip一下
+# 欢迎反馈一下缺少哪些库
 pip install -r requirement.txt
 ```
 2、mysql8安装
@@ -43,87 +59,68 @@ pip install -r requirement.txt
 ```ini
 ;reaper配置文件
 
-[port];暂时废弃，无需配置
-startnum = 21
-stopnum = 65534
-threadnum = 200
-
-
-[dns]
-dnsnum = 8000
-subdict = sub_full.txt;dict目录下自行选择添加
-
-[email];暂时废弃，无需配置
+[email];只支持qq邮箱
 email = 1
 code = 2
 emailpower = False
 
-[mysql]
-host = 192.168.1.111;修改为mysql地址，web与mysql同一服务器则127.0.0.1
+[mysql];密码不一致的话，注意修改reaper/reaper/settings.py中的DATABASES配置
+host = 127.0.0.1
 user = root
 password = 123456
 database = reaper
+
+[awvs]
+token = xxx
+website = https://awvs
 ```
-4、数据库建立
+4、数据库建立使用说明
 
-```bash
-#新建reaper数据库，编码ut8-8
-
-# 新建两个表
-CREATE TABLE `reaper`.`subdomaintask`  (
-  `id` int(0) NOT NULL AUTO_INCREMENT,
-  `task` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `intime` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `flag` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `outtime` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
-
-CREATE TABLE `reaper`.`subdomain`  (
-  `id` int(0) NOT NULL AUTO_INCREMENT,
-  `subdomain` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `title` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `wtime` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `cdn` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `record` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `ipwhere` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  `groupdomain` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 412 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+```
+新建数据库reaper编码utf-8之后，使用reaper.sql文件快速建立各个表
 ```
 
-# 使用说明
+# 快速使用
 
-web部分由于默认个人使用，没做登陆注册，之后补，，，
+1. web端
 
-进入http://你的ip/，之后f12修改cookies，新增key 123456使用
+   ```cmd
+   cd reaper
+   python manage.py runserver 0:80
+   
+   # 访问 127.0.0.1显示未授权，手动赋予 key 123456    cookie对即可使用
+   ```
 
-增加任务在web界面完成，web启动命令
+2. tools端
 
-```bash
-cd ./server/reaper/
-
-python manage.py runserver 0:8888  #8888为端口，自定义即可
+   ```cmd
+   cd reaper_tools
+   # 查看帮助
+   python start.py -h
+   
+   # 注意事项，使用oneforall命令如下：
+   python oneforall.py --target xxx.com --format json run
+   
+   # 之后将xxx.com.json文件挪到/reasult 路径下即可导入
+   # awvs限制了最多同时并发三个扫描，充分利用学生云主机性能
 ```
-
-任务增加之后，另开一个命令窗口，回到根目录下
-```bash
-python start.py #一直等到执行完吧
-```
-
-linux推荐screen后台执行
+   
+   
 
 
 # 吐槽与后续
 
-此项目1.0版本已废弃，现版本2.0，逐渐完善中，后续添加：
+此项目历经两次大改，现版本2.0
 
-- 端口扫描处理
-- 增加crawlergo爬虫
-- 增加被动扫描结果的入库
-- 增加与awvs的互动
-- 增加xray poc的结合处理
-- ......再说吧，上面这些够弄了
+~~逐渐完善中，后续添加功能~~
+
+目前应该暂时不会添加什么功能了，我的感觉是，有些没必要集成的功能，集成了反而是负担
+
+
+
+
+
+
 
 感谢1.0版本中一起开发的三位小伙伴
 
