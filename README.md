@@ -3,6 +3,16 @@
 一款SRC资产信息收集的工具，你身边的资产收割利器~
 
 [![License](D:%5CGitHub%5CReaper%5Clicense-Apache%202-green.svg)](https://www.apache.org/licenses/LICENSE-2.0)   
+# 置顶说明
+
+开源出来的Reaper，已经满足不了很多日常使用场景。当然，我自己其实使用的基本上也已经是第三代版本了，但是由于种种原因，并没有开源出来，或许等到某个恰当的时机我会再更新一波。
+
+
+
+感谢大家的使用！
+
+也欢迎熟悉django，懂分布式，熟悉web漏洞挖掘各种自动化工具的小伙伴参与Reaper的进一步研发！联系邮箱：getf_own@163.com
+
 # 功能介绍
 
 - 支持基于oneforall收集资产的导入
@@ -103,7 +113,8 @@ website = https://awvs
    
    # 之后将xxx.com.json文件挪到/reasult 路径下即可导入
    # awvs限制了最多同时并发三个扫描，充分利用学生云主机性能
-```
+   ```
+
    
    
 
@@ -127,3 +138,4 @@ website = https://awvs
 @安逸猪 @打代码要优雅 @我不会翻转二叉树
 
 感谢@b0ring师傅在2.0版本开发中的思路交流
+
